@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node keyIndex.js"
+  },
+  "dependencies": {
+    "@zerodev/ecdsa-validator": "^5.3.1",
+    "@zerodev/sdk": "^5.3.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "permissionless": "^0.1.31"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "tslib": "^2.6.3"
+  }
+}
