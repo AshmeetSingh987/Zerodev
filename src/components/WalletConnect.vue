@@ -27,6 +27,11 @@
       <div v-if="userOpComplete">
         UserOp complete: <a :href="userOpUrl">{{ userOpHash }}</a>
       </div>
+      <button @click="swapDefi">Swap Tokens</button>
+      <div v-if="swapUserOpHash">Swap UserOp hash: {{ swapUserOpHash }}</div>
+      <div v-if="swapComplete">
+        Swap complete: <a :href="swapUrl">{{ swapUserOpHash }}</a>
+      </div>
     </div>
     <div v-if="kernelError" class="error-message">{{ kernelError }}</div>
   </div>
@@ -34,6 +39,7 @@
 
 <script>
 import { ref } from 'vue'
+
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import { createWalletClient, custom } from 'viem'
 import { polygonAmoy } from 'viem/chains'
@@ -42,15 +48,15 @@ import { providerToSmartAccountSigner } from 'permissionless'
 import { createPublicClient, http, zeroAddress } from 'viem'
 import { ENTRYPOINT_ADDRESS_V07, bundlerActions } from 'permissionless'
 import {
-  baseTokenAddresses,
-  createKernelDefiClient,
-  defiTokenAddresses,
-} from '@zerodev/defi'
-import {
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
 } from '@zerodev/sdk'
+import {
+  createKernelDefiClient,
+  baseTokenAddresses,
+  defiTokenAddresses,
+} from '@zerodev/defi'
 
 export default {
   name: 'WalletConnect',
@@ -64,6 +70,9 @@ export default {
     const userOpHash = ref(null)
     const userOpComplete = ref(false)
     const userOpUrl = ref('')
+    const swapUserOpHash = ref(null)
+    const swapComplete = ref(false)
+    const swapUrl = ref('')
 
     let walletClient = null // Declare walletClient outside setup() scope
 
@@ -103,7 +112,7 @@ export default {
       }
     }
 
-    const createKernelAccount = async () => {
+    const createKernelAccountnew = async () => {
       try {
         if (!validator.value || !account.value) {
           throw new Error('ECDSA Validator or account not initialized')
@@ -114,6 +123,7 @@ export default {
             'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
           ),
         })
+        console.log('Public Client initialized', publicClient)
 
         const kernelAccountResponse = await createKernelAccount(publicClient, {
           plugins: {
@@ -163,7 +173,10 @@ export default {
         )
       }
     }
-
+    chain = polygonAmoy
+    const projectId = '925e6965-4c1a-49c4-9edc-c938ee96770f'
+    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+    console.log(defiClient)
     const sendUserOperation = async () => {
       try {
         if (!kernelClient.value) {
@@ -200,6 +213,39 @@ export default {
       }
     }
 
+    const swapDefi = async () => {
+      try {
+        if (!kernelClient.value) {
+          throw new Error('Kernel Client not initialized')
+        }
+
+        const swapUserOpHashResponse = await defiClient.sendSwapUserOp({
+          fromToken: baseTokenAddresses[polygonAmoy.id].USDC,
+          fromAmount: BigInt('100'),
+          toToken: defiTokenAddresses[polygonAmoy.id]['USDC']['aave-v3'],
+          gasToken: 'sponsored',
+        })
+
+        swapUserOpHash.value = swapUserOpHashResponse
+        console.log('Swap UserOp hash:', swapUserOpHashResponse)
+
+        // Wait for Swap UserOp to complete
+        const bundlerClient = kernelClient.value.extend(
+          bundlerActions(ENTRYPOINT_ADDRESS_V07)
+        )
+        await bundlerClient.waitForUserOperationReceipt({
+          hash: swapUserOpHashResponse,
+        })
+
+        console.log('Swap UserOp completed')
+        swapComplete.value = true
+        swapUrl.value = `https://jiffyscan.xyz/userOpHash/${swapUserOpHashResponse}`
+      } catch (err) {
+        kernelError.value = err.message || 'Failed to send Swap UserOp'
+        console.error('Error sending Swap UserOp:', err)
+      }
+    }
+
     return {
       account,
       validator,
@@ -210,9 +256,13 @@ export default {
       userOpHash,
       userOpComplete,
       userOpUrl,
+      swapUserOpHash,
+      swapComplete,
+      swapUrl,
       connectAndInitialize,
-      createKernelAccount,
+      createKernelAccountnew,
       sendUserOperation,
+      swapDefi,
     }
   },
 }
@@ -250,5 +300,9 @@ export default {
 .error-message {
   margin-top: 10px;
   color: red;
+}
+
+.kernel-client button {
+  margin-top: 10px;
 }
 </style>
