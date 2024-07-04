@@ -43,7 +43,7 @@ import { ref } from 'vue'
 
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import { createWalletClient, custom } from 'viem'
-import { polygonAmoy } from 'viem/chains'
+import { polygonAmoy, polygon, arbitrum } from 'viem/chains'
 import { KERNEL_V3_1 } from '@zerodev/sdk/constants'
 import { providerToSmartAccountSigner } from 'permissionless'
 import { createPublicClient, http, zeroAddress } from 'viem'
@@ -90,7 +90,7 @@ export default {
         )
 
         walletClient = createWalletClient({
-          chain: polygonAmoy, // Adjust as per your configuration
+          chain: polygon, // Adjust as per your configuration
           transport: custom(window.ethereum), // Adjust as per your configuration
         })
 
@@ -151,14 +151,14 @@ export default {
         kernelClient.value = createKernelAccountClient({
           account: kernelAccountResponse,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
-          chain: polygonAmoy,
+          chain: polygon,
           bundlerTransport: http(
             'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
           ),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
               const paymasterClient = createZeroDevPaymasterClient({
-                chain: polygonAmoy,
+                chain: polygon,
                 transport: http(process.env.PAYMASTER_RPC),
                 entryPoint: ENTRYPOINT_ADDRESS_V07,
               })
@@ -218,19 +218,21 @@ export default {
     }
 
     const swapDefi = async () => {
-      
-    const projectId = 'd045926c-99c5-403f-ae0f-1da6a752f3cf'
-    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
-    console.log(defiClient)
+      const projectId = 'd045926c-99c5-403f-ae0f-1da6a752f3cf'
+      const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+      console.log(defiClient)
       try {
         if (!kernelClient.value) {
           throw new Error('Kernel Client not initialized')
         }
-
+        const chain = polygon
         const swapUserOpHashResponse = await defiClient.sendSwapUserOp({
-          fromToken: baseTokenAddresses[polygonAmoy.id].USDC,
-          fromAmount: BigInt('100'),
-          toToken: defiTokenAddresses[polygonAmoy.id]['USDC']['aave-v3'],
+          chainId: defiClient.chain.id,
+          fromAddress: account.address,
+          toAddress: defiClient.account.address,
+          fromToken: baseTokenAddresses[chain.id].USDC,
+          toToken: baseTokenAddresses[chain.id].DAI,
+          fromAmount: BigInt(10000000),
           gasToken: 'sponsored',
         })
 
