@@ -42,7 +42,7 @@
 import { ref } from 'vue'
 
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
-import { createWalletClient, custom } from 'viem'
+import { createWalletClient, custom, parseUnits } from 'viem'
 import { polygonAmoy, polygon, arbitrum } from 'viem/chains'
 import { KERNEL_V3_1 } from '@zerodev/sdk/constants'
 import { providerToSmartAccountSigner } from 'permissionless'
@@ -229,11 +229,11 @@ export default {
         const chain = polygon
         const swapUserOpHashResponse = await defiClient.sendSwapUserOp({
           chainId: defiClient.chain.id,
-          fromAddress: account.address,
-          toAddress: defiClient.account.address,
+          //fromAddress: account.value,
+          //toAddress: defiClient.account.address,
           fromToken: baseTokenAddresses[chain.id].USDC,
-          toToken: baseTokenAddresses[chain.id].DAI,
-          fromAmount: BigInt(1),
+          toToken: baseTokenAddresses[chain.id].WETH,
+          fromAmount: parseUnits('1', 6),
           gasToken: 'sponsored',
         })
 
