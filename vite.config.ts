@@ -57,8 +57,9 @@ export default defineConfig({
   define: {
     'process.env': {
       VUE_APP_BACKEND_URL: 'http://localhost:3000',
-      BUNDLER_RPC: 'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f',
-      PAYMASTER_RPC: 'https://rpc.zerodev.app/api/v2/paymaster/925e6965-4c1a-49c4-9edc-c938ee96770f',
+      BUNDLER_RPC: 'https://rpc.zerodev.app/api/v2/bundler/d045926c-99c5-403f-ae0f-1da6a752f3cf',
+      PAYMASTER_RPC: 'https://rpc.zerodev.app/api/v2/paymaster/d045926c-99c5-403f-ae0f-1da6a752f3cf',
+      ENSO_API_KEY: 'e17fb01c-1c11-443c-835f-6418f207b4c1',
       //PRIVATE_KEY=,
     },
   }

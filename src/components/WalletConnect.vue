@@ -181,9 +181,6 @@ export default {
         )
       }
     }
-    const projectId = '925e6965-4c1a-49c4-9edc-c938ee96770f'
-    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
-    console.log(defiClient)
     const sendUserOperation = async () => {
       try {
         if (!kernelClient.value) {
@@ -221,6 +218,10 @@ export default {
     }
 
     const swapDefi = async () => {
+      
+    const projectId = 'd045926c-99c5-403f-ae0f-1da6a752f3cf'
+    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+    console.log(defiClient)
       try {
         if (!kernelClient.value) {
           throw new Error('Kernel Client not initialized')
