@@ -153,7 +153,7 @@ export default {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           chain: polygon,
           bundlerTransport: http(
-            'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
+            'https://rpc.zerodev.app/api/v2/bundler/8abbd50e-9d08-4157-965d-c83eab9c42c3'
           ),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
@@ -218,9 +218,10 @@ export default {
     }
 
     const swapDefi = async () => {
-      const projectId = 'd045926c-99c5-403f-ae0f-1da6a752f3cf'
-      const defiClient = createKernelDefiClient(kernelClient.value, projectId)
-      console.log(defiClient)
+      
+    const projectId = '8abbd50e-9d08-4157-965d-c83eab9c42c3'
+    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+    console.log(defiClient)
       try {
         if (!kernelClient.value) {
           throw new Error('Kernel Client not initialized')
@@ -232,7 +233,7 @@ export default {
           toAddress: defiClient.account.address,
           fromToken: baseTokenAddresses[chain.id].USDC,
           toToken: baseTokenAddresses[chain.id].DAI,
-          fromAmount: BigInt(10000000),
+          fromAmount: BigInt(1),
           gasToken: 'sponsored',
         })
 
