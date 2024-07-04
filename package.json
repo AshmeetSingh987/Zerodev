@@ -11,6 +11,7 @@
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
+    "@rollup/plugin-replace": "^5.0.7",
     "@walletconnect/web3-provider": "^1.8.0",
     "@zerodev/defi": "^0.0.13",
     "@zerodev/ecdsa-validator": "^5.3.1",
@@ -23,6 +24,8 @@
     "node-polyfill-webpack-plugin": "^4.0.0",
     "permissionless": "^0.1.31",
     "pinia": "^2.1.7",
+    "viem": "^2.16.5",
+    "vite-plugin-env-compatible": "^2.0.1",
     "vue": "^3.4.29",
     "web3modal": "^1.9.12"
   },

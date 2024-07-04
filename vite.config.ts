@@ -35,12 +35,33 @@
 //   },
 // })
 
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+// Import the necessary plugins
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import replace from '@rollup/plugin-replace';
+import envCompatible from 'vite-plugin-env-compatible';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    envCompatible(),
+    replace({
+      'process.env': JSON.stringify(process.env),
+      preventAssignment: true,
+    }),
+    // Add other plugins here
+  ],
   optimizeDeps: {
     include: ['viem'],
   },
-})
+  define: {
+    'process.env': {
+      VUE_APP_BACKEND_URL: 'http://localhost:3000',
+      BUNDLER_RPC: 'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f',
+      PAYMASTER_RPC: 'https://rpc.zerodev.app/api/v2/paymaster/925e6965-4c1a-49c4-9edc-c938ee96770f',
+      //PRIVATE_KEY=,
+    },
+  }
+  // Add other configurations here
+});
+

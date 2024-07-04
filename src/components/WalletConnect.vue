@@ -181,7 +181,6 @@ export default {
         )
       }
     }
-    chain = polygonAmoy
     const projectId = '925e6965-4c1a-49c4-9edc-c938ee96770f'
     const defiClient = createKernelDefiClient(kernelClient.value, projectId)
     console.log(defiClient)
