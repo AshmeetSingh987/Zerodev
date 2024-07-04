@@ -12,7 +12,7 @@
     <div v-if="error" class="error-message">{{ error }}</div>
 
     <button
-      @click="createKernelAccount"
+      @click="createKernelAccountnew"
       v-if="validator && account && !kernelAccount"
     >
       Create Kernel Account
