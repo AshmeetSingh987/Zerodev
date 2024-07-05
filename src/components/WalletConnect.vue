@@ -37,17 +37,17 @@
     <SessionManagement v-if="walletClient" :walletClient="walletClient" />
   </div>
 </template>
-
 <script>
 import { ref } from 'vue'
-
+import SessionManagement from './SessionManagement.vue' // Import the SessionManagement component
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import { createWalletClient, custom, parseUnits } from 'viem'
-import { polygonAmoy, polygon, arbitrum } from 'viem/chains'
+import { polygon } from 'viem/chains'
 import { KERNEL_V3_1 } from '@zerodev/sdk/constants'
 import { providerToSmartAccountSigner } from 'permissionless'
 import { createPublicClient, http, zeroAddress } from 'viem'
-import { ENTRYPOINT_ADDRESS_V07, bundlerActions } from 'permissionless'
+import { ENTRYPOINT_ADDRESS_V07, bundlerActions , toECDSASigner } from 'permissionless'
+import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
 import {
   createKernelAccount,
   createKernelAccountClient,
@@ -56,11 +56,13 @@ import {
 import {
   createKernelDefiClient,
   baseTokenAddresses,
-  defiTokenAddresses,
 } from '@zerodev/defi'
 
 export default {
   name: 'WalletConnect',
+  components: {
+    SessionManagement,
+  },
   setup() {
     const account = ref(null)
     const validator = ref(null)
@@ -75,7 +77,7 @@ export default {
     const swapComplete = ref(false)
     const swapUrl = ref('')
 
-    let walletClient = null // Declare walletClient outside setup() scope
+    const walletClient = ref(null) // Use ref for walletClient
 
     const connectAndInitialize = async () => {
       try {
@@ -89,12 +91,12 @@ export default {
           window.ethereum
         )
 
-        walletClient = createWalletClient({
+        walletClient.value = createWalletClient({
           chain: polygon, // Adjust as per your configuration
           transport: custom(window.ethereum), // Adjust as per your configuration
         })
 
-        validator.value = await signerToEcdsaValidator(walletClient, {
+        validator.value = await signerToEcdsaValidator(walletClient.value, {
           signer: smartAccountSigner,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           kernelVersion: KERNEL_V3_1,
@@ -133,12 +135,6 @@ export default {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           kernelVersion: KERNEL_V3_1,
         })
-        // For Sessions
-        // const account = createKernelAccount({
-        //   signer: ecdsaValidator,
-        //   policies: [sudoPolicy],
-        //   action,
-        // })
 
         console.log('Kernel Account :', kernelAccountResponse)
         if (!kernelAccountResponse || !kernelAccountResponse.address) {
@@ -147,6 +143,11 @@ export default {
 
         kernelAccount.value = kernelAccountResponse.address
         console.log('Kernel Account created:', kernelAccountResponse.address)
+
+        // For Sessions
+        const sessionKeySigner = await toECDSASigner(walletClient.value)
+        const sessionKeyAddress = sessionKeySigner.account.address
+        console.log('Session Key Address:', sessionKeyAddress)
 
         kernelClient.value = createKernelAccountClient({
           account: kernelAccountResponse,
@@ -181,6 +182,7 @@ export default {
         )
       }
     }
+
     const sendUserOperation = async () => {
       try {
         if (!kernelClient.value) {
@@ -218,10 +220,9 @@ export default {
     }
 
     const swapDefi = async () => {
-      
-    const projectId = '8abbd50e-9d08-4157-965d-c83eab9c42c3'
-    const defiClient = createKernelDefiClient(kernelClient.value, projectId)
-    console.log(defiClient)
+      const projectId = '8abbd50e-9d08-4157-965d-c83eab9c42c3'
+      const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+      console.log(defiClient)
       try {
         if (!kernelClient.value) {
           throw new Error('Kernel Client not initialized')
@@ -229,8 +230,6 @@ export default {
         const chain = polygon
         const swapUserOpHashResponse = await defiClient.sendSwapUserOp({
           chainId: defiClient.chain.id,
-          //fromAddress: account.value,
-          //toAddress: defiClient.account.address,
           fromToken: baseTokenAddresses[chain.id].USDC,
           toToken: baseTokenAddresses[chain.id].WETH,
           fromAmount: parseUnits('1', 6),
@@ -270,6 +269,7 @@ export default {
       swapUserOpHash,
       swapComplete,
       swapUrl,
+      walletClient,
       connectAndInitialize,
       createKernelAccountnew,
       sendUserOperation,
@@ -278,7 +278,6 @@ export default {
   },
 }
 </script>
-
 <style scoped>
 .wallet-connect {
   background-color: white;

@@ -28,20 +28,28 @@
 
 <script>
 import { ref } from 'vue'
-import { createPublicClient, http, zeroAddress } from 'viem'
-import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import {
-  toECDSASigner,
+ 
+ 
   addressToEmptyAccount,
-  toPermissionValidator,
+
   createKernelAccount,
-  serializePermissionAccount,
-  deserializePermissionAccount,
-  toRemoteSigner,
-  RemoteSignerMode,
+  
+
+
 } from '@zerodev/sdk'
-import { ENTRYPOINT_ADDRESS_V07, KERNEL_V3_1 } from '@zerodev/sdk/constants'
+import { toECDSASigner } from "@zerodev/permissions/signers"
+import {
+  
+  deserializePermissionAccount,
+  serializePermissionAccount,
+  toPermissionValidator,
+} from "@zerodev/permissions"
+import { ParamCondition, toCallPolicy, toSudoPolicy } from "@zerodev/permissions/policies"
+import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import { providerToSmartAccountSigner } from 'permissionless'
+ import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
+  import { createPublicClient, http, zeroAddress } from 'viem'
 
 export default {
   name: 'SessionManagement',
@@ -65,9 +73,8 @@ export default {
           mode: RemoteSignerMode.Create,
         })
         const sessionKeySigner = toECDSASigner({
-          signer: remoteSigner,
+          signer: walletClient,
         })
-        // Remote Signer can be replaced with WalletClient if we move forward with Client Side only
         sessionKeyAddress.value = sessionKeySigner.account.address
         console.log('Session Key Address:', sessionKeyAddress.value)
       } catch (err) {
@@ -103,7 +110,9 @@ export default {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           kernelVersion: KERNEL_V3_1,
           signer: emptySessionKeySigner,
-          policies: [sudoPolicy],
+          policies: [
+         toSudoPolicy({}),
+          ],
         })
 
         const sessionKeyAccount = await createKernelAccount(publicClient, {
@@ -127,14 +136,14 @@ export default {
 
     const useSessionKey = async () => {
       try {
-        const remoteSignerWithGet = await toRemoteSigner({
-          apiKey: 'YOUR_API_KEY', // Replace with your API key
-          keyAddress: sessionKeyAddress.value,
-          mode: RemoteSignerMode.Get,
-        })
+        // const remoteSignerWithGet = await toRemoteSigner({
+        //   apiKey: 'https://passkeys.zerodev.app/api/v3/8abbd50e-9d08-4157-965d-c83eab9c42c3', // Replace with your API key
+        //   keyAddress: sessionKeyAddress.value,
+        //   mode: RemoteSignerMode.Get,
+        // })
 
         const sessionKeySigner = toECDSASigner({
-          signer: remoteSignerWithGet,
+          signer: walletClient,
         })
 
         const publicClient = createPublicClient({
