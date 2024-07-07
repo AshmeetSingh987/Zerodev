@@ -38,25 +38,22 @@
   </div>
 </template>
 <script>
+
+
 import { ref } from 'vue'
-import SessionManagement from './SessionManagement.vue' // Import the SessionManagement component
+import SessionManagement from './SessionManagement.vue'
+import { toECDSASigner } from "@zerodev/permissions/signers"
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
 import { createWalletClient, custom, parseUnits } from 'viem'
 import { polygon } from 'viem/chains'
 import { KERNEL_V3_1 } from '@zerodev/sdk/constants'
 import { providerToSmartAccountSigner } from 'permissionless'
 import { createPublicClient, http, zeroAddress } from 'viem'
-import { ENTRYPOINT_ADDRESS_V07, bundlerActions , toECDSASigner } from 'permissionless'
+import { ENTRYPOINT_ADDRESS_V07, bundlerActions } from 'permissionless'
 import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
-import {
-  createKernelAccount,
-  createKernelAccountClient,
-  createZeroDevPaymasterClient,
-} from '@zerodev/sdk'
-import {
-  createKernelDefiClient,
-  baseTokenAddresses,
-} from '@zerodev/defi'
+import { createKernelAccount, createKernelAccountClient, createZeroDevPaymasterClient } from '@zerodev/sdk'
+import { createKernelDefiClient, baseTokenAddresses } from '@zerodev/defi'
+import { toSudoPolicy } from '@zerodev/permissions/policies'
 
 export default {
   name: 'WalletConnect',
@@ -77,7 +74,7 @@ export default {
     const swapComplete = ref(false)
     const swapUrl = ref('')
 
-    const walletClient = ref(null) // Use ref for walletClient
+    const walletClient = ref(null)
 
     const connectAndInitialize = async () => {
       try {
@@ -87,50 +84,66 @@ export default {
 
         await window.ethereum.request({ method: 'eth_requestAccounts' })
 
-        const smartAccountSigner = await providerToSmartAccountSigner(
-          window.ethereum
-        )
+        const smartAccountSigner = await providerToSmartAccountSigner(window.ethereum)
 
         walletClient.value = createWalletClient({
-          chain: polygon, // Adjust as per your configuration
-          transport: custom(window.ethereum), // Adjust as per your configuration
+          chain: polygon,
+          transport: custom(window.ethereum),
         })
 
+        const addresses = await window.ethereum.request({ method: 'eth_accounts' })
+        account.value = addresses[0]
         validator.value = await signerToEcdsaValidator(walletClient.value, {
           signer: smartAccountSigner,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           kernelVersion: KERNEL_V3_1,
         })
-
-        const addresses = await window.ethereum.request({
-          method: 'eth_accounts',
-        })
-        account.value = addresses[0] // Assuming the first account is used
-
         console.log('ECDSA Validator initialized:', validator.value)
       } catch (err) {
-        error.value =
-          err.message || 'Failed to connect and initialize ECDSA Validator'
+        error.value = err.message || 'Failed to connect and initialize ECDSA Validator'
         console.error('Error connecting and initializing:', err)
       }
     }
 
     const createKernelAccountnew = async () => {
       try {
+        
+      debugger
         if (!validator.value || !account.value) {
           throw new Error('ECDSA Validator or account not initialized')
         }
 
         const publicClient = createPublicClient({
-          transport: http(
-            'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
-          ),
+          chain: polygon,
+          transport: http('https://rpc.zerodev.app/api/v2/bundler/8abbd50e-9d08-4157-965d-c83eab9c42c3'),
         })
         console.log('Public Client initialized', publicClient)
+
+        // For Sessions
+        const sessionKeySigner = await toECDSASigner(walletClient)
+
+        const sessionKeyAddress = sessionKeySigner.account.address
+        console.log('Session Key Address:', sessionKeyAddress)
+        
+        // Ensure the session key address is valid
+        if (!sessionKeyAddress || sessionKeyAddress === zeroAddress) {
+          throw new Error('Invalid session key address')
+        }
+
+        const emptyAccount = addressToEmptyAccount(sessionKeyAddress)
+        const emptySessionKeySigner = await toECDSASigner({ signer: emptyAccount })
+
+        const permissionPlugin = await toPermissionValidator(publicClient, {
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          kernelVersion: KERNEL_V3_1,
+          signer: emptySessionKeySigner,
+          policies: [toSudoPolicy({})],
+        })
 
         const kernelAccountResponse = await createKernelAccount(publicClient, {
           plugins: {
             sudo: validator.value,
+            regular: permissionPlugin,
           },
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           kernelVersion: KERNEL_V3_1,
@@ -144,18 +157,11 @@ export default {
         kernelAccount.value = kernelAccountResponse.address
         console.log('Kernel Account created:', kernelAccountResponse.address)
 
-        // For Sessions
-        const sessionKeySigner = await toECDSASigner(walletClient.value)
-        const sessionKeyAddress = sessionKeySigner.account.address
-        console.log('Session Key Address:', sessionKeyAddress)
-
         kernelClient.value = createKernelAccountClient({
           account: kernelAccountResponse,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           chain: polygon,
-          bundlerTransport: http(
-            'https://rpc.zerodev.app/api/v2/bundler/8abbd50e-9d08-4157-965d-c83eab9c42c3'
-          ),
+          bundlerTransport: http('https://rpc.zerodev.app/api/v2/bundler/8abbd50e-9d08-4157-965d-c83eab9c42c3'),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
               const paymasterClient = createZeroDevPaymasterClient({
@@ -173,13 +179,8 @@ export default {
 
         console.log('Kernel Client initialized')
       } catch (err) {
-        kernelError.value =
-          err.message ||
-          'Failed to create Kernel Account or initialize Kernel Client'
-        console.error(
-          'Error creating Kernel Account or initializing Kernel Client:',
-          err
-        )
+        kernelError.value = err.message || 'Failed to create Kernel Account or initialize Kernel Client'
+        console.error('Error creating Kernel Account or initializing Kernel Client:', err)
       }
     }
 
@@ -203,12 +204,8 @@ export default {
         console.log('UserOp hash:', userOpHashResponse)
 
         // Wait for UserOp to complete
-        const bundlerClient = kernelClient.value.extend(
-          bundlerActions(ENTRYPOINT_ADDRESS_V07)
-        )
-        await bundlerClient.waitForUserOperationReceipt({
-          hash: userOpHashResponse,
-        })
+        const bundlerClient = kernelClient.value.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07))
+        await bundlerClient.waitForUserOperationReceipt({ hash: userOpHashResponse })
 
         console.log('UserOp completed')
         userOpComplete.value = true
@@ -240,12 +237,8 @@ export default {
         console.log('Swap UserOp hash:', swapUserOpHashResponse)
 
         // Wait for Swap UserOp to complete
-        const bundlerClient = kernelClient.value.extend(
-          bundlerActions(ENTRYPOINT_ADDRESS_V07)
-        )
-        await bundlerClient.waitForUserOperationReceipt({
-          hash: swapUserOpHashResponse,
-        })
+        const bundlerClient = kernelClient.value.extend(bundlerActions(ENTRYPOINT_ADDRESS_V07))
+        await bundlerClient.waitForUserOperationReceipt({ hash: swapUserOpHashResponse })
 
         console.log('Swap UserOp completed')
         swapComplete.value = true
@@ -277,6 +270,9 @@ export default {
     }
   },
 }
+
+
+
 </script>
 <style scoped>
 .wallet-connect {
