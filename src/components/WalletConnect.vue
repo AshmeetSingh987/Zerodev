@@ -50,7 +50,7 @@ import { providerToSmartAccountSigner } from 'permissionless'
 import { createPublicClient, http, zeroAddress } from 'viem'
 import { ENTRYPOINT_ADDRESS_V07, bundlerActions } from 'permissionless'
 import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
-import { createKernelAccount as zdCreateKernelAccount, createKernelAccountClient as zdCreateKernelAccountClient, createZeroDevPaymasterClient as zdCreateZeroDevPaymasterClient } from '@zerodev/sdk'
+import { createKernelAccount , createKernelAccountClient , createZeroDevPaymasterClient  } from '@zerodev/sdk'
 import { createKernelDefiClient, baseTokenAddresses } from '@zerodev/defi'
 import { toSudoPolicy } from '@zerodev/permissions/policies'
 import {toPermissionValidator } from '@zerodev/permissions'
@@ -125,7 +125,7 @@ const createKernelAccountnew = async () => {
     ],
     kernelVersion: KERNEL_V3_1
   })
-        const kernelAccountResponse = await zdCreateKernelAccount(publicClient, {
+        const kernelAccountResponse = await createKernelAccount(publicClient, {
           plugins: {
             sudo: validator.value,
             regular: permissionPlugin,
@@ -142,16 +142,16 @@ const createKernelAccountnew = async () => {
         kernelAccount.value = kernelAccountResponse.address
         console.log('Kernel Account created:', kernelAccountResponse.address)
 
-        kernelClient.value = zdCreateKernelAccountClient({
+        kernelClient.value = createKernelAccountClient({
           account: kernelAccountResponse,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           chain: polygon,
           bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
-              const paymasterClient = zdCreateZeroDevPaymasterClient({
+              const paymasterClient = createZeroDevPaymasterClient({
                 chain: polygon,
-                transport: http(process.env.PAYMASTER_RPC),
+                transport: http(process.env.polygon.PAYMASTER_RPC),
                 entryPoint: ENTRYPOINT_ADDRESS_V07,
               })
               return paymasterClient.sponsorUserOperation({
