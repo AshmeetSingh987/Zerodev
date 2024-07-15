@@ -18,8 +18,8 @@ dependencies:
     specifier: ^5.3.1
     version: 5.3.1(@zerodev/sdk@5.3.2)(permissionless@0.1.35)(viem@2.17.0)
   '@zerodev/permissions':
-    specifier: ^5.3.1
-    version: 5.3.1(@zerodev/sdk@5.3.2)(permissionless@0.1.35)(viem@2.17.0)
+    specifier: ^5.3.2
+    version: 5.3.2(@zerodev/sdk@5.3.2)(@zerodev/webauthn-key@5.3.1)(permissionless@0.1.35)(viem@2.17.0)
   '@zerodev/remote-signer':
     specifier: ^5.2.2
     version: 5.2.2(@zerodev/sdk@5.3.2)(permissionless@0.1.35)(viem@2.17.0)
@@ -910,6 +910,12 @@ packages:
       '@scure/base': 1.1.7
     dev: false
 
+  /@simplewebauthn/browser@8.3.7:
+    resolution: {integrity: sha512-ZtRf+pUEgOCvjrYsbMsJfiHOdKcrSZt2zrAnIIpfmA06r0FxBovFYq0rJ171soZbe13KmWzAoLKjSxVW7KxCdQ==}
+    dependencies:
+      '@simplewebauthn/typescript-types': 8.3.4
+    dev: false
+
   /@simplewebauthn/browser@9.0.1:
     resolution: {integrity: sha512-wD2WpbkaEP4170s13/HUxPcAV5y4ZXaKo1TfNklS5zDefPinIgXOpgz1kpEvobAsaLPa2KeH7AKKX/od1mrBJw==}
     dependencies:
@@ -918,6 +924,11 @@ packages:
 
   /@simplewebauthn/types@9.0.1:
     resolution: {integrity: sha512-tGSRP1QvsAvsJmnOlRQyw/mvK9gnPtjEc5fg2+m8n+QUa+D7rvrKkOYyfpy42GTs90X3RDOnqJgfHt+qO67/+w==}
+    dev: false
+
+  /@simplewebauthn/typescript-types@8.3.4:
+    resolution: {integrity: sha512-38xtca0OqfRVNloKBrFB5LEM6PN5vzFbJG6rAutPVrtGHFYxPdiV3btYWq0eAZAZmP+dqFPYJxJWeJrGfmYHng==}
+    deprecated: This package has been renamed to @simplewebauthn/types. Please install @simplewebauthn/types instead to ensure you receive future updates.
     dev: false
 
   /@tsconfig/node20@20.1.4:
@@ -1470,15 +1481,17 @@ packages:
       viem: 2.17.0(typescript@5.4.5)
     dev: false
 
-  /@zerodev/permissions@5.3.1(@zerodev/sdk@5.3.2)(permissionless@0.1.35)(viem@2.17.0):
-    resolution: {integrity: sha512-BETaBURUFMSniC8oIu64/puvta7oxmpH0ngW75RM9GShgZYMri1nx/UGYBq2IV3568kd5ReZ1m4GLDcdjFTtQQ==}
+  /@zerodev/permissions@5.3.2(@zerodev/sdk@5.3.2)(@zerodev/webauthn-key@5.3.1)(permissionless@0.1.35)(viem@2.17.0):
+    resolution: {integrity: sha512-ckj2Ml2xLPkN+TXH3uYI/WdEG8J2McKuL0xAXy9ZDCfi8XkiY4A/Uj/pR189qJzGhxU5iqW0NGY/MBBJaMv02w==}
     peerDependencies:
       '@zerodev/sdk': ^5.2.13
+      '@zerodev/webauthn-key': ^5.3.0
       permissionless: ^0.1.18
       viem: ^2.16.3
     dependencies:
       '@simplewebauthn/browser': 9.0.1
       '@zerodev/sdk': 5.3.2(permissionless@0.1.35)(viem@2.17.0)
+      '@zerodev/webauthn-key': 5.3.1(viem@2.17.0)
       merkletreejs: 0.3.11
       permissionless: 0.1.35(viem@2.17.0)
       viem: 2.17.0(typescript@5.4.5)
@@ -1504,6 +1517,16 @@ packages:
     dependencies:
       permissionless: 0.1.35(viem@2.17.0)
       semver: 7.6.2
+      viem: 2.17.0(typescript@5.4.5)
+    dev: false
+
+  /@zerodev/webauthn-key@5.3.1(viem@2.17.0):
+    resolution: {integrity: sha512-8s/gdKppXgh15wrER50nAIhaD/QTEwecN288RbXI+TWVmdwzuLOpbMuzfgBvisfiE1kNJlfYEl9qos7aKm6EkQ==}
+    peerDependencies:
+      viem: ^2.16.3
+    dependencies:
+      '@noble/curves': 1.4.2
+      '@simplewebauthn/browser': 8.3.7
       viem: 2.17.0(typescript@5.4.5)
     dev: false
 
