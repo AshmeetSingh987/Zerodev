@@ -45,7 +45,7 @@ import { ref } from 'vue'
 import SessionManagement from './SessionManagement.vue'
 import { toECDSASigner } from "@zerodev/permissions/signers"
 import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator'
-import { createWalletClient, custom, parseUnits, Hex } from 'viem'
+import { createWalletClient, custom, parseUnits } from 'viem'
 import { polygon } from 'viem/chains'
 import { KERNEL_V3_1 } from '@zerodev/sdk/constants'
 import { providerToSmartAccountSigner } from 'permissionless'
@@ -55,8 +55,9 @@ import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
 import { createKernelAccount , createKernelAccountClient , createZeroDevPaymasterClient  } from '@zerodev/sdk'
 import { createKernelDefiClient, baseTokenAddresses } from '@zerodev/defi'
 import { toSudoPolicy } from '@zerodev/permissions/policies'
-import {toPermissionValidator } from '@zerodev/permissions'
-import { ModularSigner } from '@zerodev/permissions'
+import {deserializePermissionAccount, toPermissionValidator } from '@zerodev/permissions'
+// import { ModularSigner } from '@zerodev/permissions'
+import { privateKeyToAccount } from 'viem/accounts'
 export default {
   name: 'WalletConnect',
   components: {
@@ -119,6 +120,20 @@ const createKernelAccountnew = async () => {
         })
         console.log('Public Client initialized', publicClient)
         const smartAccountSigner = await providerToSmartAccountSigner(window.ethereum)
+        const signer = privateKeyToAccount(process.env.polygon.PRIVATE_KEY)
+        const SessionValidator = await signerToEcdsaValidator(publicClient, {
+          signer,
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          kernelVersion: KERNEL_V3_1,
+        })
+        const masterAccountResponse = await createKernelAccount(publicClient, {
+          plugins: {
+            sudo: SessionValidator,
+          },
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          kernelVersion: KERNEL_V3_1,
+        })
+        console.log('Master Account:', masterAccountResponse)
         const permissionPlugin = await toPermissionValidator(publicClient, {
     entryPoint:ENTRYPOINT_ADDRESS_V07,
     signer: smartAccountSigner,
@@ -128,7 +143,7 @@ const createKernelAccountnew = async () => {
     ],
     kernelVersion: KERNEL_V3_1
   })
-        const kernelAccountResponse = await createKernelAccount(publicClient, {
+        const sessionKeyAccount = await createKernelAccount(publicClient, {
           plugins: {
             sudo: validator.value,
             regular: permissionPlugin,
@@ -137,45 +152,79 @@ const createKernelAccountnew = async () => {
           kernelVersion: KERNEL_V3_1,
         })
 
-        console.log('Kernel Account:', kernelAccountResponse)
-        if (!kernelAccountResponse || !kernelAccountResponse.address) {
-          throw new Error('Kernel Account response or address is undefined')
-        }
+        console.log('Kernel Account:', sessionKeyAccount.address)
+        const serializedSessionKey = await serializePermissionAccount(sessionKeyAccount, process.env.polygon.PRIVATE_KEY)
+        console.log('Serialized Session Key:', serializedSessionKey)
 
-        kernelAccount.value = kernelAccountResponse.address
-        console.log('Kernel Account created:', kernelAccountResponse.address)
+        
 
-        kernelClient.value = createKernelAccountClient({
-          account: kernelAccountResponse,
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
-          chain: polygon,
-          bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
-          middleware: {
-            sponsorUserOperation: async ({ userOperation }) => {
-              const paymasterClient = createZeroDevPaymasterClient({
-                chain: polygon,
-                transport: http(process.env.polygon.PAYMASTER_RPC),
-                entryPoint: ENTRYPOINT_ADDRESS_V07,
-              })
-              return paymasterClient.sponsorUserOperation({
-                userOperation,
-                entryPoint: ENTRYPOINT_ADDRESS_V07,
-              })
-            },
-          },
-        })
+        // kernelAccount.value = kernelAccountResponse.address
+        // console.log('Kernel Account created:', kernelAccountResponse.address)
 
-        console.log('Kernel Client initialized')
-      } catch (err) {
-        kernelError.value =
-          err.message ||
-          'Failed to create Kernel Account or initialize Kernel Client'
-        console.error(
-          'Error creating Kernel Account or initializing Kernel Client:',
-          err
-        )
-      }
-    }
+        // kernelClient.value = createKernelAccountClient({
+        //   account: kernelAccountResponse,
+        //   entryPoint: ENTRYPOINT_ADDRESS_V07,
+        //   chain: polygon,
+        //   bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+        //   middleware: {
+        //     sponsorUserOperation: async ({ userOperation }) => {
+        //       const paymasterClient = createZeroDevPaymasterClient({
+        //         chain: polygon,
+        //         transport: http(process.env.polygon.PAYMASTER_RPC),
+        //         entryPoint: ENTRYPOINT_ADDRESS_V07,
+        //       })
+        //       return paymasterClient.sponsorUserOperation({
+        //         userOperation,
+        //         entryPoint: ENTRYPOINT_ADDRESS_V07,
+        //       })
+        //     },
+        //   },
+        // })
+
+        const sessionKeyAccountClient = await deserializePermissionAccount(
+          publicClient,
+          ENTRYPOINT_ADDRESS_V07,
+          KERNEL_V3_1,
+          serializedSessionKey
+        ) 
+        console.log('Session Key Account Client deceriealized ', sessionKeyAccountClient.address)
+      
+         const kernelPaymaster = createZeroDevPaymasterClient({
+    entryPoint,
+    chain: polygon,
+    transport: http(process.env.polygon.PAYMASTER_RPC),
+  });
+  const kernelClient = createKernelAccountClient({
+    entryPoint,
+    account: sessionKeyAccountClient,
+    chain: polygon,
+    bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+    middleware: {
+      sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
+    },
+  });
+
+  const userOpHash = await kernelClient.sendUserOperation({
+    userOperation: {
+      callData: await sessionKeyAccountClient.encodeCallData({
+        to: zeroAddress,
+        value: BigInt(0),
+        data: "0x",
+      }),
+    },
+  });
+  console.log( 'in user ops ');
+
+  } catch (err) {
+    kernelError.value =
+      err.message ||
+      'Failed to create Kernel Account or initialize Kernel Client'
+    console.error(
+      'Error creating Kernel Account or initializing Kernel Client:',
+      err
+    )
+  };
+}
     const sendUserOperation = async () => {
       try {
         if (!kernelClient.value) {
@@ -245,100 +294,100 @@ const createKernelAccountnew = async () => {
           transport: http(process.env.polygon.BUNDLER_RPC),
         })
         console.log('Public Client initialized under Sessions ', publicClient)
-  const SessionSigner = privateKeyToAccount(process.env.PRIVATE_KEY);
+  // const SessionSigner = privateKeyToAccount(process.env.PRIVATE_KEY);
 
-  const createSessionKey = async (
-    sessionKeySigner,
-    sessionPrivateKey
-  ) => {
-    const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
-      SessionSigner,
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      kernelVersion: KERNEL_V3_1,
-    });  
-    const masterAccount = await createKernelAccount(publicClient, {
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      plugins: {
-        sudo: ecdsaValidator,
-      },
-      kernelVersion: KERNEL_V3_1,
-    });
-    console.log('Master Account:', masterAccount.address);
+  // const createSessionKey = async (
+  //   sessionKeySigner,
+  //   sessionPrivateKey
+  // ) => {
+  //   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
+  //     SessionSigner,
+  //     entryPoint: ENTRYPOINT_ADDRESS_V07,
+  //     kernelVersion: KERNEL_V3_1,
+  //   });  
+  //   const masterAccount = await createKernelAccount(publicClient, {
+  //     entryPoint: ENTRYPOINT_ADDRESS_V07,
+  //     plugins: {
+  //       sudo: ecdsaValidator,
+  //     },
+  //     kernelVersion: KERNEL_V3_1,
+  //   });
+  //   console.log('Master Account:', masterAccount.address);
 
-    const permissionPlugin = await toPermissionValidator(publicClient, {
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      signer: SessionKeySigner,
-      policies: [
-        toSudoPolicy({}),
-      ],
-      kernelVersion: KERNEL_V3_1
-    });
-    const sessionKeyAccount = await createKernelAccount(publicClient, {
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      plugins: {
-        sudo: ecdsaValidator,
-        regular: permissionPlugin,
-      },
-      kernelVersion: KERNEL_V3_1,
-    });
+  //   const permissionPlugin = await toPermissionValidator(publicClient, {
+  //     entryPoint: ENTRYPOINT_ADDRESS_V07,
+  //     signer: SessionKeySigner,
+  //     policies: [
+  //       toSudoPolicy({}),
+  //     ],
+  //     kernelVersion: KERNEL_V3_1
+  //   });
+  //   const sessionKeyAccount = await createKernelAccount(publicClient, {
+  //     entryPoint: ENTRYPOINT_ADDRESS_V07,
+  //     plugins: {
+  //       sudo: ecdsaValidator,
+  //       regular: permissionPlugin,
+  //     },
+  //     kernelVersion: KERNEL_V3_1,
+  //   });
 
-    console.log('Session Key Account:', sessionKeyAccount.address); 
-    return await serializePermissionAccount(sessionKeyAccount, sessionPrivateKey);
-  };
+  //   console.log('Session Key Account:', sessionKeyAccount.address); 
+  //   return await serializePermissionAccount(sessionKeyAccount, sessionPrivateKey);
+  // };
 
-  const useSessionKey = async (serializedSessionKey) => {
-    const sessionKeyAccount = await deserializePermissionAccount(
-      publicClient,
+  // const useSessionKey = async (serializedSessionKey) => {
+  //   const sessionKeyAccount = await deserializePermissionAccount(
+  //     publicClient,
 
-      entryPoint,
-      KERNEL_V3_1,
-      serializedSessionKey
-    );
+  //     entryPoint,
+  //     KERNEL_V3_1,
+  //     serializedSessionKey
+  //   );
 
-    const kernelPaymaster = createZeroDevPaymasterClient({
-      entryPoint,
-      chain: polygon,
-      transport: http(process.env.PAYMASTER_RPC),
-    });
-    const kernelClient = createKernelAccountClient({
-      entryPoint,
-      account: sessionKeyAccount,
-      chain: polygon,
-      bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
-      middleware: {
-        sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
-      },
-    });
+  //   const kernelPaymaster = createZeroDevPaymasterClient({
+  //     entryPoint,
+  //     chain: polygon,
+  //     transport: http(process.env.PAYMASTER_RPC),
+  //   });
+  //   const kernelClient = createKernelAccountClient({
+  //     entryPoint,
+  //     account: sessionKeyAccount,
+  //     chain: polygon,
+  //     bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+  //     middleware: {
+  //       sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
+  //     },
+  //   });
 
-    const userOpHash = await kernelClient.sendUserOperation({
-      userOperation: {
-        callData: await sessionKeyAccount.encodeCallData({
-          to: zeroAddress,
-          value: BigInt(0),
-          data: "0x",
-        }),
-      },
-    });
+  //   const userOpHash = await kernelClient.sendUserOperation({
+  //     userOperation: {
+  //       callData: await sessionKeyAccount.encodeCallData({
+  //         to: zeroAddress,
+  //         value: BigInt(0),
+  //         data: "0x",
+  //       }),
+  //     },
+  //   });
 
-    console.log("userOp hash:", userOpHash);
-  };
+  //   console.log("userOp hash:", userOpHash);
+  // };
 
-  console.log(session);
+  // console.log(session);
 
-  const createSessionKeyButton = async () => {
-    const sessionKeySigner = await toECDSASigner({
-      signer: sessionKeyAccount,
-    });
-    const serializedSessionKey = await createSessionKey(
-      sessionKeySigner,
-      sessionPrivateKey
-    );
-    console.log("Serialized Session Key:", serializedSessionKey);
-  };
+  // const createSessionKeyButton = async () => {
+  //   const sessionKeySigner = await toECDSASigner({
+  //     signer: sessionKeyAccount,
+  //   });
+  //   const serializedSessionKey = await createSessionKey(
+  //     sessionKeySigner,
+  //     sessionPrivateKey
+  //   );
+  //   console.log("Serialized Session Key:", serializedSessionKey);
+  // };
 
-  const useSessionKeyButton = async () => {
-    await useSessionKey(serializedSessionKey);
-  }
+  // const useSessionKeyButton = async () => {
+  //   await useSessionKey(serializedSessionKey);
+  // }
 
   return {
     account,
@@ -358,10 +407,12 @@ const createKernelAccountnew = async () => {
     createKernelAccountnew,
     sendUserOperation,
     swapDefi,
-    createSessionKeyButton,
-    useSessionKeyButton,
+    // createSessionKeyButton,
+    // useSessionKeyButton,
     
   }
+},
+}
 </script>
 <style scoped>
 .wallet-connect {
