@@ -18,36 +18,27 @@
   <script>
   import { ref } from 'vue'
   import {
-  createKernelAccount,
-  createZeroDevPaymasterClient,
-  createKernelAccountClient,
-} from "@zerodev/sdk"
-import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator"
-import { ENTRYPOINT_ADDRESS_V07 } from "permissionless"
-import {
-  http,
-
-  createPublicClient,
-  parseAbi,
-  encodeFunctionData,
-  zeroAddress,
-} from "viem"
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
-import { sepolia } from "viem/chains"
-import { toECDSASigner } from "@zerodev/permissions/signers"
-import {
- 
-  deserializePermissionAccount,
-  serializePermissionAccount,
-  toPermissionValidator,
-} from "@zerodev/permissions"
-import { ParamCondition, toCallPolicy, toSudoPolicy } from "@zerodev/permissions/policies"
-import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
-
- 
-  
-  
-
+    createKernelAccount,
+    createZeroDevPaymasterClient,
+    createKernelAccountClient,
+  } from "@zerodev/sdk"
+  import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator"
+  import { ENTRYPOINT_ADDRESS_V07 } from "permissionless"
+  import {
+    http,
+    createPublicClient,
+    zeroAddress,
+  } from "viem"
+  import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
+  import { polygon, sepolia } from "viem/chains"
+  import { toECDSASigner } from "@zerodev/permissions/signers"
+  import {
+    deserializePermissionAccount,
+    serializePermissionAccount,
+    toPermissionValidator,
+  } from "@zerodev/permissions"
+  import { toSudoPolicy } from "@zerodev/permissions/policies"
+  import { KERNEL_V3_1 } from "@zerodev/sdk/constants"
   
   export default {
     name: 'SessionKeyManager',
@@ -56,7 +47,8 @@ import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
       const deserializedSessionKey = ref(null)
       const sessionError = ref(null)
       const publicClient = createPublicClient({
-        transport: http(process.env.VUE_APP_BUNDLER_RPC),
+        chain: polygon,
+        transport: http(process.env.polygon.BUNDLER_RPC),
       })
       const signer = privateKeyToAccount(process.env.polygon.PRIVATE_KEY)
   
