@@ -2,18 +2,19 @@
   <div id="app">
     <WalletConnect />
     <EcdsaValidator />
+    <SessionKeyManager />
   </div>
 </template>
 
 <script>
 import WalletConnect from './components/WalletConnect.vue'
 import EcdsaValidator from './components/EcdsaValidator.vue'
-
+import SessionKeyManager from './components/SessionKeyManager.vue'
 export default {
   name: 'App',
   components: {
     WalletConnect,
-  
+  SessionKeyManager
   },
 }
 </script>

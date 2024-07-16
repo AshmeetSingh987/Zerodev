@@ -55,7 +55,7 @@ import { toRemoteSigner, RemoteSignerMode } from "@zerodev/remote-signer"
 import { createKernelAccount , createKernelAccountClient , createZeroDevPaymasterClient  } from '@zerodev/sdk'
 import { createKernelDefiClient, baseTokenAddresses } from '@zerodev/defi'
 import { toSudoPolicy } from '@zerodev/permissions/policies'
-import {deserializePermissionAccount, toPermissionValidator } from '@zerodev/permissions'
+import {deserializePermissionAccount,serializePermissionAccount, toPermissionValidator } from '@zerodev/permissions'
 // import { ModularSigner } from '@zerodev/permissions'
 import { privateKeyToAccount } from 'viem/accounts'
 export default {
@@ -136,13 +136,14 @@ const createKernelAccountnew = async () => {
         console.log('Master Account:', masterAccountResponse)
         const permissionPlugin = await toPermissionValidator(publicClient, {
     entryPoint:ENTRYPOINT_ADDRESS_V07,
-    signer: smartAccountSigner,
+    signer: signer,
     policies: [
     
       toSudoPolicy({}),
     ],
     kernelVersion: KERNEL_V3_1
-  })
+  }) 
+
         const sessionKeyAccount = await createKernelAccount(publicClient, {
           plugins: {
             sudo: validator.value,
