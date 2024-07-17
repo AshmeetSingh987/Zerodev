@@ -101,7 +101,7 @@ export default {
 
         const publicClient = createPublicClient({
           transport: http(
-            'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
+            process.env.polygon.BUNDLER_RPC
           ),
         })
         console.log('Public Client initialized', publicClient)
@@ -126,7 +126,7 @@ export default {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           chain: polygon,
           bundlerTransport: http(
-            'https://rpc.zerodev.app/api/v2/bundler/925e6965-4c1a-49c4-9edc-c938ee96770f'
+            process.env.polygon.BUNDLER_RPC
           ),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
@@ -148,7 +148,7 @@ export default {
       }
     }
 
-    const createSessionKey = async (sessionPrivateKey) => {
+    const createSessionKey = async () => {
       try {
         const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
@@ -182,7 +182,7 @@ export default {
         })
 
         console.log('Session Pointer Account:', sessionPointerAccount)
-        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, sessionPrivateKey)
+        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, )
       } catch (error) {
         sessionError.value = error.message
       }
@@ -230,8 +230,8 @@ export default {
     }
 
     const createSessionKeyButton = async () => {
-      const sessionPrivateKey = generatePrivateKey()
-      await createSessionKey(sessionPrivateKey)
+      // const  = generatePrivateKey()
+      await createSessionKey()
     }
 
     const useSessionKeyButton = async () => {
