@@ -172,7 +172,7 @@ export default {
           kernelVersion: KERNEL_V3_1,
         })
 
-        const sessionKeyAccount = await createKernelAccount(publicClient, { // session pointer 
+        const sessionPointerAccount = await createKernelAccount(publicClient, {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           plugins: {
             sudo: ecdsaValidator,
@@ -181,7 +181,8 @@ export default {
           kernelVersion: KERNEL_V3_1,
         })
 
-        sessionKey.value = await serializePermissionAccount(sessionKeyAccount, sessionPrivateKey)
+        console.log('Session Pointer Account:', sessionPointerAccount)
+        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, sessionPrivateKey)
       } catch (error) {
         sessionError.value = error.message
       }
@@ -189,7 +190,7 @@ export default {
 
     const useSessionKey = async (serializedSessionKey) => {
       try {
-        const sessionKeyAccount = await deserializePermissionAccount(
+        const sessionPointerAccount = await deserializePermissionAccount(
           publicClient,
           ENTRYPOINT_ADDRESS_V07,
           KERNEL_V3_1,
@@ -203,7 +204,7 @@ export default {
         })
         const kernelClient = createKernelAccountClient({
           entryPoint: ENTRYPOINT_ADDRESS_V07,
-          account: sessionKeyAccount,
+          account: sessionPointerAccount,
           chain: polygon,
           bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
           middleware: {
@@ -213,7 +214,7 @@ export default {
 
         const userOpHash = await kernelClient.sendUserOperation({
           userOperation: {
-            callData: await sessionKeyAccount.encodeCallData({
+            callData: await sessionPointerAccount.encodeCallData({
               to: zeroAddress,
               value: BigInt(0),
               data: '0x',
