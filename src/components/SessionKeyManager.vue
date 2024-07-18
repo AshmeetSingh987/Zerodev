@@ -57,6 +57,7 @@ export default {
     const kernelAccount = ref(null)
     const kernelClient = ref(null)
     const smartAccountSigner = ref(null)
+    const serializedSessionKey = ref(null)
 
     const publicClient = createPublicClient({
       chain: polygon,
@@ -100,9 +101,7 @@ export default {
         }
 
         const publicClient = createPublicClient({
-          transport: http(
-            process.env.polygon.BUNDLER_RPC
-          ),
+          transport: http(process.env.polygon.BUNDLER_RPC),
         })
         console.log('Public Client initialized', publicClient)
 
@@ -125,9 +124,7 @@ export default {
           account: kernelAccountResponse,
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           chain: polygon,
-          bundlerTransport: http(
-            process.env.polygon.BUNDLER_RPC
-          ),
+          bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
           middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
               const paymasterClient = createZeroDevPaymasterClient({
@@ -182,7 +179,9 @@ export default {
         })
 
         console.log('Session Pointer Account:', sessionPointerAccount)
-        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
+        const serializedKey = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
+        sessionKey.value = serializedKey
+        return serializedKey
       } catch (error) {
         sessionError.value = error.message
         console.error('Error creating session key:', error)
@@ -191,12 +190,15 @@ export default {
 
     const useSessionKey = async (serializedSessionKey) => {
       try {
+        console.log('Using serialized session key:', serializedSessionKey)
+
         const sessionPointerAccount = await deserializePermissionAccount(
           publicClient,
           ENTRYPOINT_ADDRESS_V07,
           KERNEL_V3_1,
           serializedSessionKey
         )
+        console.log('Session pointer account under use Session :', sessionPointerAccount)
 
         const kernelPaymaster = createZeroDevPaymasterClient({
           entryPoint: ENTRYPOINT_ADDRESS_V07,
@@ -236,9 +238,10 @@ export default {
         const sessionPrivateKey = generatePrivateKey()
         const sessionKeyAccount = privateKeyToAccount(sessionPrivateKey)
         console.log('Generated session key account:', sessionKeyAccount)
-        const sessionKeySigner = toECDSASigner({signer: sessionKeyAccount})
+        const sessionKeySigner = toECDSASigner({ signer: sessionKeyAccount })
         console.log('Generated session key signer:', sessionKeySigner)
-        await createSessionKey(sessionKeySigner, sessionKeyAccount)
+        serializedSessionKey.value = await createSessionKey(sessionKeySigner, sessionKeyAccount)
+        console.log('Serialized session key:', serializedSessionKey.value)
       } catch (error) {
         sessionError.value = error.message
         console.error('Error in createSessionKeyButton:', error)
@@ -246,8 +249,8 @@ export default {
     }
 
     const useSessionKeyButton = async () => {
-      if (sessionKey.value) {
-        await useSessionKey(sessionKey.value)
+      if (serializedSessionKey.value) {
+        await useSessionKey(serializedSessionKey.value)
       } else {
         sessionError.value = 'No session key available. Create a session key first.'
       }
