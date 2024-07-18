@@ -43,3 +43,5 @@ Steps in which this application works are as follows:
 4. The Kernel Account is created and the address is displayed on the screen.
 5. The Kernel Account is then used to send transactions.
 6. Further User ops are created which are bundled up and transaction is sent.
+
+For Making session work Metamask wallet should be on Polygon for now

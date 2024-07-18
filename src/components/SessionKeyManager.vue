@@ -148,7 +148,7 @@ export default {
       }
     }
 
-    const createSessionKey = async () => {
+    const createSessionKey = async (sessionKeySigner, sessionKeyAccount) => {
       try {
         const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
@@ -167,7 +167,7 @@ export default {
 
         const permissionPlugin = await toPermissionValidator(publicClient, {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
-          signer: smartAccountSigner.value,
+          signer: sessionKeySigner,
           policies: [toSudoPolicy({})],
           kernelVersion: KERNEL_V3_1,
         })
@@ -182,9 +182,10 @@ export default {
         })
 
         console.log('Session Pointer Account:', sessionPointerAccount)
-        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, )
+        sessionKey.value = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
       } catch (error) {
         sessionError.value = error.message
+        console.error('Error creating session key:', error)
       }
     }
 
@@ -226,12 +227,22 @@ export default {
         deserializedSessionKey.value = userOpHash
       } catch (error) {
         sessionError.value = error.message
+        console.error('Error using session key:', error)
       }
     }
 
     const createSessionKeyButton = async () => {
-      // const  = generatePrivateKey()
-      await createSessionKey()
+      try {
+        const sessionPrivateKey = generatePrivateKey()
+        const sessionKeyAccount = privateKeyToAccount(sessionPrivateKey)
+        console.log('Generated session key account:', sessionKeyAccount)
+        const sessionKeySigner = toECDSASigner({signer: sessionKeyAccount})
+        console.log('Generated session key signer:', sessionKeySigner)
+        await createSessionKey(sessionKeySigner, sessionKeyAccount)
+      } catch (error) {
+        sessionError.value = error.message
+        console.error('Error in createSessionKeyButton:', error)
+      }
     }
 
     const useSessionKeyButton = async () => {
