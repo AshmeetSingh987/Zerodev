@@ -204,10 +204,6 @@ console.log('Approval:', approval)
       throw new Error('Serialized session key is missing')
     }
 
-    // Validate Base64 encoding
-    if (!isValidBase64(serializedSessionKey)) {
-      throw new Error('Serialized session key is not a valid Base64 encoded string')
-    }
 
     console.log('Using serialized session key:', serializedSessionKey)
 
@@ -263,12 +259,7 @@ console.log('Approval:', approval)
   }
 }
 
-// Helper function to validate Base64 encoding
-function isValidBase64(str) {
-  // Base64 string should only include A-Z, a-z, 0-9, +, /, and possibly ending with '='
-  const base64Pattern = /^[A-Za-z0-9+/=]+$/;
-  return base64Pattern.test(str);
-}
+
     const createSessionKeyButton = async () => {
       try {
         sessionPrivateKey.value = generatePrivateKey()
