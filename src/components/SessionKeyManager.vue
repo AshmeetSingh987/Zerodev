@@ -58,6 +58,7 @@ export default {
     const kernelClient = ref(null)
     const smartAccountSigner = ref(null)
     const serializedSessionKey = ref(null)
+    const sessionPrivateKey = ref(null)
 
     const publicClient = createPublicClient({
       chain: polygon,
@@ -147,6 +148,10 @@ export default {
 
     const createSessionKey = async (sessionKeySigner, sessionKeyAccount) => {
       try {
+        if (!sessionKeySigner || !sessionKeyAccount) {
+          throw new Error('Session key signer or account is missing')
+        }
+
         const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
           entryPoint: ENTRYPOINT_ADDRESS_V07,
           signer: smartAccountSigner.value,
@@ -177,9 +182,14 @@ export default {
           },
           kernelVersion: KERNEL_V3_1,
         })
-
+        const approval = await serializePermissionAccount(sessionPointerAccount)
+console.log('Approval:', approval)
         console.log('Session Pointer Account:', sessionPointerAccount)
         const serializedKey = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
+
+        if (!serializedKey) {
+          throw new Error('Failed to serialize session key')
+        }
         sessionKey.value = serializedKey
         return serializedKey
       } catch (error) {
@@ -189,54 +199,80 @@ export default {
     }
 
     const useSessionKey = async (serializedSessionKey) => {
-      try {
-        console.log('Using serialized session key:', serializedSessionKey)
-
-        const sessionPointerAccount = await deserializePermissionAccount(
-          publicClient,
-          ENTRYPOINT_ADDRESS_V07,
-          KERNEL_V3_1,
-          serializedSessionKey
-        )
-        console.log('Session pointer account under use Session :', sessionPointerAccount)
-
-        const kernelPaymaster = createZeroDevPaymasterClient({
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
-          chain: polygon,
-          transport: http(process.env.polygon.PAYMASTER_RPC),
-        })
-        const kernelClient = createKernelAccountClient({
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
-          account: sessionPointerAccount,
-          chain: polygon,
-          bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
-          middleware: {
-            sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
-          },
-        })
-
-        const userOpHash = await kernelClient.sendUserOperation({
-          userOperation: {
-            callData: await sessionPointerAccount.encodeCallData({
-              to: zeroAddress,
-              value: BigInt(0),
-              data: '0x',
-            }),
-          },
-        })
-
-        console.log('userOp hash:', userOpHash)
-        deserializedSessionKey.value = userOpHash
-      } catch (error) {
-        sessionError.value = error.message
-        console.error('Error using session key:', error)
-      }
+  try {
+    if (!serializedSessionKey) {
+      throw new Error('Serialized session key is missing')
     }
 
+    // Validate Base64 encoding
+    if (!isValidBase64(serializedSessionKey)) {
+      throw new Error('Serialized session key is not a valid Base64 encoded string')
+    }
+
+    console.log('Using serialized session key:', serializedSessionKey)
+
+    const sessionKeySigner = await toECDSASigner({
+      signer: privateKeyToAccount(sessionPrivateKey.value),
+    })
+    const sessionPointerAccount = await deserializePermissionAccount(
+      publicClient,
+      ENTRYPOINT_ADDRESS_V07,
+      KERNEL_V3_1,
+      serializedSessionKey,
+      sessionKeySigner,
+    )
+    if (!sessionPointerAccount) {
+      throw new Error('Failed to deserialize session pointer account')
+    }
+    console.log('Session pointer account:', sessionPointerAccount)
+
+    const kernelPaymaster = createZeroDevPaymasterClient({
+      entryPoint: ENTRYPOINT_ADDRESS_V07,
+      chain: polygon,
+      transport: http(process.env.polygon.PAYMASTER_RPC),
+    })
+    const kernelClient = createKernelAccountClient({
+      entryPoint: ENTRYPOINT_ADDRESS_V07,
+      account: sessionPointerAccount,
+      chain: polygon,
+      bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+      middleware: {
+        sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
+      },
+    })
+
+    const userOpHash = await kernelClient.sendUserOperation({
+      userOperation: {
+        callData: await sessionPointerAccount.encodeCallData({
+          to: zeroAddress,
+          value: BigInt(0),
+          data: '0x',
+        }),
+      },
+    })
+
+    if (!userOpHash) {
+      throw new Error('Failed to send user operation')
+    }
+
+    console.log('userOp hash:', userOpHash)
+    deserializedSessionKey.value = userOpHash
+  } catch (error) {
+    sessionError.value = error.message
+    console.error('Error using session key:', error)
+  }
+}
+
+// Helper function to validate Base64 encoding
+function isValidBase64(str) {
+  // Base64 string should only include A-Z, a-z, 0-9, +, /, and possibly ending with '='
+  const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+  return base64Pattern.test(str);
+}
     const createSessionKeyButton = async () => {
       try {
-        const sessionPrivateKey = generatePrivateKey()
-        const sessionKeyAccount = privateKeyToAccount(sessionPrivateKey)
+        sessionPrivateKey.value = generatePrivateKey()
+        const sessionKeyAccount = privateKeyToAccount(sessionPrivateKey.value)
         console.log('Generated session key account:', sessionKeyAccount)
         const sessionKeySigner = toECDSASigner({ signer: sessionKeyAccount })
         console.log('Generated session key signer:', sessionKeySigner)
@@ -249,7 +285,9 @@ export default {
     }
 
     const useSessionKeyButton = async () => {
-      if (serializedSessionKey.value) {
+      console.log('Serialized session key on button click:', serializedSessionKey.value)
+      console.log('Session private key on button click:', sessionPrivateKey.value)
+      if (serializedSessionKey.value && sessionPrivateKey.value) {
         await useSessionKey(serializedSessionKey.value)
       } else {
         sessionError.value = 'No session key available. Create a session key first.'
