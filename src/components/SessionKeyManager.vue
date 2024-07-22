@@ -14,6 +14,14 @@
       <pre>{{ deserializedSessionKey }}</pre>
     </div>
     <div v-if="sessionError" class="error-message">{{ sessionError }}</div>
+    
+    
+    <button @click="">Swap DeFi Tokens </button>
+    <div v-if="swapComplete" class="success-message">
+      <p>Swap Complete!</p>
+      <a :href="swapUrl" target="_blank">View on JiffyScan</a>
+    </div>
+    <div v-if="kernelError" class="error-message">{{ kernelError }}</div>
   </div>
 </template>
 
@@ -43,7 +51,12 @@ import {
 import { providerToSmartAccountSigner } from 'permissionless'
 import { toSudoPolicy } from "@zerodev/permissions/policies"
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants"
-import { createWalletClient } from 'viem'
+import { createWalletClient ,parseUnits} from 'viem'
+import {
+  createKernelDefiClient,
+  baseTokenAddresses,
+  defiTokenAddresses,
+} from '@zerodev/defi'
 
 export default {
   name: 'SessionKeyManager',
@@ -51,6 +64,7 @@ export default {
     const sessionKey = ref(null)
     const deserializedSessionKey = ref(null)
     const sessionError = ref(null)
+    const kernelError = ref(null)
     const walletClient = ref(null)
     const account = ref(null)
     const validator = ref(null)
@@ -59,6 +73,8 @@ export default {
     const smartAccountSigner = ref(null)
     const serializedSessionKey = ref(null)
     const sessionPrivateKey = ref(null)
+    const swapComplete = ref(false)
+    const swapUrl = ref(null)
 
     const publicClient = createPublicClient({
       chain: polygon,
@@ -182,9 +198,8 @@ export default {
           },
           kernelVersion: KERNEL_V3_1,
         })
-        const approval = await serializePermissionAccount(sessionPointerAccount)
-console.log('Approval:', approval)
         console.log('Session Pointer Account:', sessionPointerAccount)
+
         const serializedKey = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
 
         if (!serializedKey) {
@@ -199,66 +214,95 @@ console.log('Approval:', approval)
     }
 
     const useSessionKey = async (serializedSessionKey) => {
-  try {
-    if (!serializedSessionKey) {
-      throw new Error('Serialized session key is missing')
+      try {
+        if (!serializedSessionKey) {
+          throw new Error('Serialized session key is missing')
+        }
+
+        console.log('Using serialized session key:', serializedSessionKey)
+
+        const sessionKeySigner = await toECDSASigner({
+          signer: privateKeyToAccount(sessionPrivateKey.value),
+        })
+        const sessionPointerAccount = await deserializePermissionAccount(
+          publicClient,
+          ENTRYPOINT_ADDRESS_V07,
+          KERNEL_V3_1,
+          serializedSessionKey,
+          sessionKeySigner,
+        )
+        if (!sessionPointerAccount) {
+          throw new Error('Failed to deserialize session pointer account')
+        }
+        console.log('Session pointer account:', sessionPointerAccount)
+        const projectId = process.env.polygon.PROJECT_ID
+        const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+
+        const kernelPaymaster = createZeroDevPaymasterClient({
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          chain: polygon,
+          transport: http(process.env.polygon.PAYMASTER_RPC),
+        })
+        kernelClient.value = createKernelAccountClient({
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          account: sessionPointerAccount,
+          chain: polygon,
+          bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+          middleware: {
+            sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
+          },
+        })
+        if (!defiClient) {
+        kernelError.value = 'Defi Client not initialized'
+        return console.error('Defi Client not initialized')
+      }
+      console.log(defiClient)
+      const accountBalances= await defiClient.listTokenBalances({
+  account: kernelClient.value.account.address,
+  chainId: chain.id,
+})
+console.log('Account Balances:', accountBalances)
+      try {
+        const chain = polygon
+        const swapParams = {
+          fromToken: baseTokenAddresses[chain.id].USDC,
+          toToken: baseTokenAddresses[chain.id].WETH,
+          fromAmount: parseUnits('10',6), // Adjust amount as needed
+          gasToken: 'sponsored',
+        }
+
+
+        console.log('Sending Swap Op', swapParams)
+        const swapUserOpHashResponse = await defiClient.sendSwapUserOp(swapParams)
+        swapUrl.value = `https://jiffyscan.xyz/userOpHash/${swapUserOpHashResponse}`
+        swapComplete.value = true
+        console.log('Swap UserOp hash:', swapUserOpHashResponse)}
+        catch (err) {
+        kernelError.value = err.message || 'Failed to send Swap UserOp'
+        console.error('Error sending Swap UserOp:', err)
+      }
+    
+        const userOpHash = await kernelClient.value.sendUserOperation({
+          userOperation: {
+            callData: await sessionPointerAccount.encodeCallData({
+              to: zeroAddress,
+              value: BigInt(0),
+              data: '0x',
+            }),
+          },
+        })
+
+        if (!userOpHash) {
+          throw new Error('Failed to send user operation')
+        }
+
+        console.log('userOp hash:', userOpHash)
+        deserializedSessionKey.value = userOpHash
+      } catch (error) {
+        sessionError.value = error.message
+        console.error('Error using session key:', error)
+      }
     }
-
-
-    console.log('Using serialized session key:', serializedSessionKey)
-
-    const sessionKeySigner = await toECDSASigner({
-      signer: privateKeyToAccount(sessionPrivateKey.value),
-    })
-    const sessionPointerAccount = await deserializePermissionAccount(
-      publicClient,
-      ENTRYPOINT_ADDRESS_V07,
-      KERNEL_V3_1,
-      serializedSessionKey,
-      sessionKeySigner,
-    )
-    if (!sessionPointerAccount) {
-      throw new Error('Failed to deserialize session pointer account')
-    }
-    console.log('Session pointer account:', sessionPointerAccount)
-
-    const kernelPaymaster = createZeroDevPaymasterClient({
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      chain: polygon,
-      transport: http(process.env.polygon.PAYMASTER_RPC),
-    })
-    const kernelClient = createKernelAccountClient({
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      account: sessionPointerAccount,
-      chain: polygon,
-      bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
-      middleware: {
-        sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
-      },
-    })
-
-    const userOpHash = await kernelClient.sendUserOperation({
-      userOperation: {
-        callData: await sessionPointerAccount.encodeCallData({
-          to: zeroAddress,
-          value: BigInt(0),
-          data: '0x',
-        }),
-      },
-    })
-
-    if (!userOpHash) {
-      throw new Error('Failed to send user operation')
-    }
-
-    console.log('userOp hash:', userOpHash)
-    deserializedSessionKey.value = userOpHash
-  } catch (error) {
-    sessionError.value = error.message
-    console.error('Error using session key:', error)
-  }
-}
-
 
     const createSessionKeyButton = async () => {
       try {
@@ -280,19 +324,76 @@ console.log('Approval:', approval)
       console.log('Session private key on button click:', sessionPrivateKey.value)
       if (serializedSessionKey.value && sessionPrivateKey.value) {
         await useSessionKey(serializedSessionKey.value)
+        console.log('use session key done now doing under Swap Defi' )
+        // await swapDefi(serializedSessionKey.value)
       } else {
         sessionError.value = 'No session key available. Create a session key first.'
       }
     }
+// Added under Use Session 
+//     const swapDefi = async (serializedSessionKey) => {
+//       const projectId = process.env.polygon.PROJECT_ID
+//       // if (!kernelClient.value) {
+//       //   kernelError.value = 'Kernel Client not initialized'
+//       //   return console.error('Kernel Client not initialized')
+//       // }
+//       kernelClient.value = createKernelAccountClient({
+//           entryPoint: ENTRYPOINT_ADDRESS_V07,
+//           account: sessionPointerAccount,
+//           chain: polygon,
+//           bundlerTransport: http(process.env.polygon.BUNDLER_RPC),
+//           middleware: {
+//             sponsorUserOperation: kernelPaymaster.sponsorUserOperation,
+//           },
+//         })
+//       console.log('Kernel Client:', kernelClient.value)
+//       const defiClient = createKernelDefiClient(kernelClient.value, projectId)
+//       if (!defiClient) {
+//         kernelError.value = 'Defi Client not initialized'
+//         return console.error('Defi Client not initialized')
+//       }
+//       console.log(defiClient)
+//       try {
+//         const chain = polygon
+//         const swapParams = {
+//           fromToken: defiTokenAddresses[chain.id].USDC,
+//           toToken: defiTokenAddresses[chain.id].WETH,
+//           fromAmount: parseUnits('10',6), // Adjust amount as needed
+//           gasToken: 'sponsored',
+//         }
+
+
+//         console.log('Sending Swap Op', swapParams)
+//         const swapUserOpHashResponse = await defiClient.sendSwapUserOp(swapParams)
+
+// const accountBalances= await defiClient.listTokenBalances({
+//   account: kernelClient.value.account.address,
+//   chainId: chain.id,
+// })
+// console.log('Account Balances:', accountBalances)
+
+//         swapUrl.value = `https://jiffyscan.xyz/userOpHash/${swapUserOpHashResponse}`
+//         swapComplete.value = true
+
+//         console.log('Swap UserOp hash:', swapUserOpHashResponse)
+//       } catch (err) {
+//         kernelError.value = err.message || 'Failed to send Swap UserOp'
+//         console.error('Error sending Swap UserOp:', err)
+//       }
+//     }
 
     return {
       connectAndInitialize,
       createKernelAccountnew,
       createSessionKeyButton,
       useSessionKeyButton,
+      // swapDefi,
       sessionKey,
       deserializedSessionKey,
       sessionError,
+      kernelError,
+      swapComplete,
+      swapUrl,
     }
   },
 }
@@ -309,7 +410,12 @@ button {
   margin: 10px 0;
 }
 
-.error-message {
+.error-message, .success-message {
   color: red;
 }
+
+.success-message {
+  color: green;
+}
 </style>
+
