@@ -3,6 +3,10 @@
     <h2>Session Key Manager</h2>
     <button @click="sessionManager.connectAndInitialize">Connect and Initialize</button>
     <button @click="sessionManager.createKernelAccountnew">Create Kernel Account</button>
+    <div v-if="sessionManager.kernelAccount" class="kernel-account">
+      <p>Kernel Account Address:</p>
+      <pre>{{ sessionManager.kernelAccount }}</pre>
+    </div>
     <button @click="sessionManager.createSessionKeyButton">Create Session Key</button>
     <div v-if="sessionManager.sessionKey" class="session-key">
       <p>Session Key Created:</p>
@@ -13,12 +17,14 @@
       <p>Session Key Deserialized:</p>
       <pre>{{ sessionManager.deserializedSessionKey }}</pre>
     </div>
+    
     <div v-if="sessionManager.sessionError" class="error-message">{{ sessionManager.sessionError }}</div>
     <button @click="sessionManager.swapDefi">Swap DeFi Tokens</button>
     <div v-if="sessionManager.swapComplete" class="success-message">
       <p>Swap Complete!</p>
       <a :href="sessionManager.swapUrl" target="_blank">View on JiffyScan</a>
     </div>
+   
     <div v-if="sessionManager.kernelError" class="error-message">{{ sessionManager.kernelError }}</div>
   </div>
 </template>
@@ -176,6 +182,7 @@ class SessionManager {
       })
       console.log('Account address:', masterAccount.address)
 
+      
       const permissionPlugin = await toPermissionValidator(this.publicClient, {
         entryPoint: ENTRYPOINT_ADDRESS_V07,
         signer: sessionKeySigner,
@@ -192,7 +199,12 @@ class SessionManager {
         kernelVersion: KERNEL_V3_1,
       })
       console.log('Session Pointer Account:', sessionPointerAccount)
+//  const accountBalances = await sessionPointerAccount.listTokenBalances({
+//   account: this.kernelClient.address,
+//   chainId: polygon.id,
 
+// })
+// console.log('Account balances:', accountBalances)
       const serializedKey = await serializePermissionAccount(sessionPointerAccount, sessionKeyAccount.privateKey)
 
       if (!serializedKey) {
@@ -250,6 +262,26 @@ class SessionManager {
       })
 
       this.deserializedSessionKey.value = sessionPointerAccount
+
+      const defiClient = createKernelDefiClient(this.kernelClient.value, process.env.polygon.PROJECT_ID)
+
+      const swapAmount = parseUnits('1', 6) // Example amount, adjust as needed
+      const swapParams = {
+        fromToken: baseTokenAddresses[polygon.id].USDC,
+        toToken: baseTokenAddresses[polygon.id].USDT,
+        fromAmount: BigInt(2),
+        gasToken: 'sponsored',
+      }
+     
+      console.log(baseTokenAddresses[polygon.id].USDC , "USDC")
+      console.log(baseTokenAddresses[polygon.id].USDT, "USDT")
+
+      console.log('Sending Swap Op', swapParams)
+      const swapUserOpHashResponse = await defiClient.sendSwapUserOp(swapParams)
+      this.swapUrl.value = `https://jiffyscan.xyz/userOpHash/${swapUserOpHashResponse}`
+      this.swapComplete.value = true
+      console.log('Swap UserOp hash:', swapUserOpHashResponse)
+
     } catch (error) {
       this.sessionError.value = error.message
       console.error('Error using session key:', error)
@@ -263,15 +295,20 @@ class SessionManager {
       }
       const defiClient = createKernelDefiClient(this.kernelClient.value, process.env.polygon.PROJECT_ID)
 
-      const swapAmount = parseUnits('10', 6) // Example amount, adjust as needed
+      const swapAmount = parseUnits('1', 6) // Example amount, adjust as needed
       const swapParams = {
         fromToken: baseTokenAddresses[polygon.id].USDC,
-        toToken: baseTokenAddresses[polygon.id].WETH,
-        fromAmount: swapAmount,
+        toToken: baseTokenAddresses[polygon.id]['USDT']['aave-v3'],
+        fromAmount: BigInt(2),
         gasToken: 'sponsored',
       }
 
       console.log('Sending Swap Op', swapParams)
+      const accountBalances = await defiClient.listTokenBalances({
+  account: this.kernelClient.address,
+  chainId: polygon.id,
+})
+console.log('Account balances:', accountBalances)
       const swapUserOpHashResponse = await defiClient.sendSwapUserOp(swapParams)
       this.swapUrl.value = `https://jiffyscan.xyz/userOpHash/${swapUserOpHashResponse}`
       this.swapComplete.value = true
