@@ -65,6 +65,7 @@ export default defineConfig({
       PROJECT_ID: '8abbd50e-9d08-4157-965d-c83eab9c42c3',
       PRIVATE_KEY:
         '0xf4f8027386114fea9fa340e804cfa581c7da2d3b48c5dee06d29033f281abdea',
+      POLYGONSCAN_API_KEY: '27I1EXYVGADZQ3ZSYB3EHD4Y2RKAK587XS',
     },
     'process.env.sepolia': {
       VUE_APP_BACKEND_URL: 'http://localhost:3000',
