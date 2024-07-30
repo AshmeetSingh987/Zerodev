@@ -66,6 +66,17 @@
         </li>
       </ul>
     </div>
+
+    <!-- Display token balances -->
+    <div v-if="sessionManager.balance.length > 0" class="balances">
+      <h3>Token Balances:</h3>
+      <ul>
+        <li v-for="balance in sessionManager.balance" :key="balance.token">
+          <p>Token: {{ balance.token }}</p>
+          <p>Amount: {{ balance.amount }}</p>
+        </li>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -124,6 +135,7 @@ class SessionManager {
     this.kernelAccounts = ref([])
     this.allKernelAccounts = ref([])
     this.currentKernelIndex = ref(0)
+    this.balance = ref([])
     this.publicClient = createPublicClient({
       chain: polygon,
       transport: http(process.env.polygon.BUNDLER_RPC),
@@ -317,7 +329,9 @@ class SessionManager {
       console.error('Error creating session key:', error)
     }
   }
-
+  formatBalance(amount, decimals) {
+    return Number(amount) / Math.pow(6, decimals);
+  }
   async useSessionKey(serializedSessionKey) {
     try {
       if (!serializedSessionKey) {
@@ -364,6 +378,16 @@ class SessionManager {
       this.deserializedSessionKey.value = sessionPointerAccount
 
       const defiClient = createKernelDefiClient(this.kernelClient.value, process.env.polygon.PROJECT_ID)
+      const accountBalances = await defiClient.listTokenBalances({
+        account: "0x41E716e7b7f8A4d597564dd8096e5bB56C45f4dB",
+        chainId: polygon.id,
+      }) 
+      console.log("accountBalances After Swap :",accountBalances )
+      // Format the balances
+      this.balance.value = accountBalances.map(balance => ({
+        token: balance.token,
+        amount: this.formatBalance(balance.amount, balance.decimals),
+      }));
 
       const swapAmount = parseUnits('1', 6) // Example amount, adjust as needed
       const swapParams = {
@@ -380,12 +404,7 @@ class SessionManager {
       this.swapComplete.value = true
       console.log('Swap UserOp hash:', swapUserOpHashResponse)
 
-      const accountBalancesAfterSwap = await defiClient.listTokenBalances({
-        account: "0x41E716e7b7f8A4d597564dd8096e5bB56C45f4dB",
-        chainId: polygon.id,
-      }) 
-      console.log("accountBalances After Swap :", accountBalancesAfterSwap)
-
+     
     } catch (error) {
       this.sessionError.value = error.message
       console.error('Error using session key:', error)
