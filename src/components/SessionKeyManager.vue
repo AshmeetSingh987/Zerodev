@@ -66,7 +66,21 @@
         </li>
       </ul>
     </div>
-
+    <button @click="sessionManager.fetchBalancesForAllKernelAccounts">Fetch Balances for All Kernel Accounts</button>
+    <div v-if="sessionManager.allBalances.length > 0" class="all-balances">
+      <h3>Balances for All Kernel Accounts:</h3>
+      <ul>
+        <li v-for="accountBalances in sessionManager.allBalances" :key="accountBalances.account">
+          <p>Account: {{ accountBalances.account }}</p>
+          <ul>
+            <li v-for="balance in accountBalances.balances" :key="balance.token">
+              <p>Token: {{ balance.token }}</p>
+              <p>Amount: {{ balance.amount }}</p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
     <!-- Display token balances -->
     <div v-if="sessionManager.balance.length > 0" class="balances">
       <h3>Token Balances:</h3>
@@ -136,6 +150,7 @@ class SessionManager {
     this.allKernelAccounts = ref([])
     this.currentKernelIndex = ref(0)
     this.balance = ref([])
+    this.allBalances = ref([])
     this.publicClient = createPublicClient({
       chain: polygon,
       transport: http(process.env.polygon.BUNDLER_RPC),
@@ -153,7 +168,37 @@ class SessionManager {
     }
   }
 
-  
+  async fetchBalancesForAllKernelAccounts() {
+    try {
+      if (this.allKernelAccounts.value.length === 0) {
+        throw new Error('No kernel accounts found');
+      }
+
+      const balances = [];
+
+      for (const account of this.allKernelAccounts.value) {
+        const defiClient = createKernelDefiClient(this.kernelClient.value, process.env.polygon.PROJECT_ID);
+
+        const accountBalances = await defiClient.listTokenBalances({
+          account: account.address,
+          chainId: polygon.id,
+        });
+
+        balances.push({
+          account: account.address,
+          balances: accountBalances.map(balance => ({
+            token: balance.token,
+            amount: this.formatBalance(balance.amount, balance.decimals),
+          })),
+        });
+      }
+
+      this.allBalances.value = balances;
+    } catch (error) {
+      this.sessionError.value = error.message;
+      console.error('Error fetching balances for all kernel accounts:', error);
+    }
+  }
   async initializeKernelClient(address) {
     const kernelAccountResponse = await createKernelAccount(this.publicClient, {
       plugins: {
@@ -332,6 +377,7 @@ class SessionManager {
   formatBalance(amount, decimals) {
     return Number(amount) / Math.pow(6, decimals);
   }
+
   async useSessionKey(serializedSessionKey) {
     try {
       if (!serializedSessionKey) {
@@ -411,6 +457,43 @@ class SessionManager {
     }
   }
 
+
+  // With Server Side
+  async useSessionKeyButton() {
+  try {
+    console.log('Serialized session key on button click:', this.serializedSessionKey.value)
+    console.log('Session private key on button click:', this.sessionPrivateKey.value)
+    if (!this.serializedSessionKey.value || !this.sessionPrivateKey.value) {
+      throw new Error('No session key available. Create a session key first.');
+    }
+
+    const response = await fetch('/api/use-session-key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        serializedSessionKey: this.serializedSessionKey.value,
+        sessionPrivateKey: this.sessionPrivateKey.value,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to use session key on server');
+    }
+
+    const result = await response.json();
+    this.deserializedSessionKey.value = result.deserializedSessionKey;
+    this.swapUrl.value = result.swapUrl;
+    this.swapComplete.value = true;
+
+    console.log('Swap UserOp hash:', result.swapUserOpHash);
+  } catch (error) {
+    this.sessionError.value = error.message;
+    console.error('Error using session key:', error);
+  }
+}
+
   async fetchRecentTransactions() {
     try {
       if (!this.kernelAccount.value) {
@@ -485,16 +568,16 @@ class SessionManager {
       console.error('Error in createSessionKeyButton:', error)
     }
   }
-
-  async useSessionKeyButton() {
-    console.log('Serialized session key on button click:', this.serializedSessionKey.value)
-    console.log('Session private key on button click:', this.sessionPrivateKey.value)
-    if (this.serializedSessionKey.value && this.sessionPrivateKey.value) {
-      await this.useSessionKey(this.serializedSessionKey.value)
-    } else {
-      this.sessionError.value = 'No session key available. Create a session key first.'
-    }
-  }
+// // Without Server Side 
+//   async useSessionKeyButton() {
+//     console.log('Serialized session key on button click:', this.serializedSessionKey.value)
+//     console.log('Session private key on button click:', this.sessionPrivateKey.value)
+//     if (this.serializedSessionKey.value && this.sessionPrivateKey.value) {
+//       await this.useSessionKey(this.serializedSessionKey.value)
+//     } else {
+//       this.sessionError.value = 'No session key available. Create a session key first.'
+//     }
+//   }
 
   async getAllKernelAccounts() {
     try {

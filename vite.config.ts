@@ -51,6 +51,15 @@ export default defineConfig({
     }),
     // Add other plugins here
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5173', // Replace with your actual backend server URL
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   optimizeDeps: {
     include: ['viem'],
   },
@@ -63,8 +72,7 @@ export default defineConfig({
         'https://rpc.zerodev.app/api/v2/paymaster/8abbd50e-9d08-4157-965d-c83eab9c42c3',
       ENSO_API_KEY: 'e17fb01c-1c11-443c-835f-6418f207b4c1',
       PROJECT_ID: '8abbd50e-9d08-4157-965d-c83eab9c42c3',
-      PRIVATE_KEY:
-        '0xf4f8027386114fea9fa340e804cfa581c7da2d3b48c5dee06d29033f281abdea',
+      PRIVATE_KEY: '',
       POLYGONSCAN_API_KEY: '27I1EXYVGADZQ3ZSYB3EHD4Y2RKAK587XS',
     },
     'process.env.sepolia': {
